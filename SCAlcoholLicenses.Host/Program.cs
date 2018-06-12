@@ -18,9 +18,13 @@ namespace SCAlcoholLicenses.Host
 		private static async Task Run()
 		{
 			// midnight, yo
-			var seenOn = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day);
+			var seenOn = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, DateTime.UtcNow.Day);
 
-			var client = new LicenseClient();
+			var logger = NLog.LogManager.GetCurrentClassLogger();
+
+			logger.Info("Starting execution.");
+
+			var client = new LicenseClient(logger);
 			using (var db = new ApplicationDbContext())
 			{
 				var transaction = db.Database.BeginTransaction(System.Data.IsolationLevel.ReadUncommitted);
@@ -53,8 +57,9 @@ namespace SCAlcoholLicenses.Host
 						};
 
 						db.Licenses.Add(dbLicense);
-						db.SaveChanges();
 					}
+
+					db.SaveChanges();
 				}, () =>
 				{
 					transaction.Commit();
@@ -63,6 +68,8 @@ namespace SCAlcoholLicenses.Host
 				});
 
 			}
+
+			logger.Info("Completed execution.");
 		}
 	}
 }

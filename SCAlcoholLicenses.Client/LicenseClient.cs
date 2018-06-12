@@ -1,9 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
-using System.Threading.Tasks;
+using NLog;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
@@ -12,16 +11,31 @@ namespace SCAlcoholLicenses.Client
 {
 	public class LicenseClient
 	{
+		private readonly ILogger _logger;
+
+		public LicenseClient(ILogger logger)
+		{
+			_logger = logger;
+		}
+
 		public void GetLicenses(Action<AlcoholLicense> recordCallback, Action pageCallback)
 		{
+			var arguments = ConfigurationManager.AppSettings.Get("Chrome.Arguments");
+			var binaryLocation = ConfigurationManager.AppSettings.Get("Chrome.BinaryLocation");
+
+			_logger.Debug("Starting Chrome with arguments: " + arguments);
+			_logger.Debug("Starting Chrome with binary location: " + binaryLocation);
+
 			var chromeOptions = new ChromeOptions();
-			//chromeOptions.AddArguments("headless");
-			chromeOptions.BinaryLocation = @"C:\Program Files (x86)\Google\Chrome Beta\Application\chrome.exe";
+
+			if (arguments != "") chromeOptions.AddArguments(arguments.Split(','));
+			if (binaryLocation != "") chromeOptions.BinaryLocation = binaryLocation;
 
 			var browser = new ChromeDriver(chromeOptions);
 
 			var wait = new WebDriverWait(browser, TimeSpan.FromSeconds(20));
 
+			_logger.Debug("Navigating to MyDORWay");
 
 			browser.Navigate().GoToUrl("https://mydorway.dor.sc.gov/");
 
@@ -38,6 +52,8 @@ namespace SCAlcoholLicenses.Client
 					return false;
 				}
 			});
+
+			_logger.Debug("Clicking ABL licenses link");
 
 			// click on the link to get to the ABL licenses page
 			browser.FindElementById("caption2_d-a1").Click();
@@ -56,11 +72,15 @@ namespace SCAlcoholLicenses.Client
 				}
 			});
 
+			_logger.Debug("Clicking search button");
+
 			// click on the search button
 			browser.FindElementById("d-9").Click();
 
 			// wait for results to load
 			WaitForResultsToLoad(wait);
+
+			_logger.Debug("Starting loop...");
 
 			var keepGoing = true;
 			do
@@ -74,6 +94,8 @@ namespace SCAlcoholLicenses.Client
 				var openDates = browser.FindElementsByClassName("d-h");
 				var closeDates = browser.FindElementsByClassName("d-i");
 				var lbdWholesalers = browser.FindElementsByXPath("//td[ contains( @class, 'd-j' ) ]//input");
+
+				_logger.Debug("Got " + licenseNumbers.Count + " records");
 
 				var licenses = new List<AlcoholLicense>();
 				for (var i = 0; i < licenseNumbers.Count; i++)
@@ -104,6 +126,8 @@ namespace SCAlcoholLicenses.Client
 					licenses.Add(license);
 				}
 
+				_logger.Debug("Parsing complete");
+
 				foreach (var license in licenses)
 				{
 					recordCallback(license);
@@ -111,36 +135,7 @@ namespace SCAlcoholLicenses.Client
 
 				pageCallback();
 
-				//var rows = browser.FindElementsByXPath("//table[ @id='d-k' ]/tbody/tr");
-
-				//foreach (var row in rows)
-				//{
-				//	var licenseNumber = row.FindElement(By.ClassName("d-b")).Text;
-				//	var businessName = row.FindElement(By.ClassName("d-c")).Text;
-				//	var legalName = row.FindElement(By.ClassName("d-d")).Text;
-				//	var locationAddress = row.FindElement(By.ClassName("d-e")).Text;
-				//	var city = row.FindElement(By.ClassName("d-f")).Text;
-				//	var licenseType = row.FindElement(By.ClassName("d-g")).Text;
-				//	var openDate = row.FindElement(By.ClassName("d-h")).Text;
-				//	var closeDate = row.FindElement(By.ClassName("d-i")).Text;
-
-				//	var lbdWholesaler = row.FindElement(By.ClassName("d-j")).FindElement(By.TagName("input")).Selected;
-
-				//	var license = new AlcoholLicense()
-				//	{
-				//		LicenseNumber = licenseNumber,
-				//		BusinessName = businessName,
-				//		LegalName = legalName,
-				//		LocationAddress = locationAddress,
-				//		City = city,
-				//		LicenseType = licenseType,
-				//		OpenDate = DateTime.Parse(openDate),
-				//		CloseDate = DateTime.Parse(closeDate),
-				//		LbdWholesaler = lbdWholesaler,
-				//	};
-
-				//	licenses.Add(license);
-				//}
+				_logger.Debug("Page complete");
 
 				// get the current page number
 				var pageInfo = browser.FindElementById("d-k_pgof").Text.Replace(",", "");
@@ -150,10 +145,14 @@ namespace SCAlcoholLicenses.Client
 				
 				if (currentPage >= totalPages)
 				{
+					_logger.Debug("Current page " + currentPage + " is > than " + totalPages + " total pages, stopping.");
+
 					keepGoing = false;
 				}
 				else
 				{
+					_logger.Debug("Navigating to page " + (currentPage + 1));
+
 					browser.FindElementById("d-k_pgnext").Click();
 
 					WaitForResultsToLoad(wait, currentPage + 1);
