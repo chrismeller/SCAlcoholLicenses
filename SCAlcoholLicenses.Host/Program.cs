@@ -5,6 +5,7 @@ using System.Transactions;
 using SCAlcoholLicenses.Client;
 using SCAlcoholLicenses.Data;
 using SCAlcoholLicenses.Data.Models;
+using SCAlcoholLicenses.Domain;
 
 namespace SCAlcoholLicenses.Host
 {
@@ -26,40 +27,16 @@ namespace SCAlcoholLicenses.Host
 
 			var client = new LicenseClient(logger);
 			using (var db = new ApplicationDbContext())
+			using (var service = new LicenseService(db))
 			{
 				var transaction = db.Database.BeginTransaction(System.Data.IsolationLevel.ReadUncommitted);
 
 				client.GetLicenses((license) =>
 				{
-					var existing = db.Licenses.FirstOrDefault(x => x.LicenseNumber == license.LicenseNumber && x.OpenDate == license.OpenDate);
-					if (existing != null)
-					{
-						existing.LastSeen = seenOn;
-					}
-					else
-					{
-
-						var dbLicense = new License()
-						{
-							Id = Guid.NewGuid(),
-							BusinessName = license.BusinessName,
-							City = license.City,
-							CloseDate = license.CloseDate,
-							LbdWholesaler = license.LbdWholesaler,
-							LegalName = license.LegalName,
-							LicenseNumber = license.LicenseNumber,
-							LicenseType = license.LicenseType,
-							LocationAddress = license.LocationAddress,
-							OpenDate = license.OpenDate,
-
-							FirstSeen = seenOn,
-							LastSeen = seenOn,
-						};
-
-						db.Licenses.Add(dbLicense);
-					}
-
-					db.SaveChanges();
+					var task = service.Upsert(license.LicenseNumber, license.BusinessName, license.LegalName,
+						license.LocationAddress, license.City, license.LicenseType, license.OpenDate,
+						license.CloseDate, license.LbdWholesaler, seenOn);
+					task.Wait();
 				}, () =>
 				{
 					transaction.Commit();
