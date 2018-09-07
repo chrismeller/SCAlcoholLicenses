@@ -21,29 +21,36 @@ namespace SCAlcoholLicenses.Host
 			// midnight, yo
 			var seenOn = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, DateTime.UtcNow.Day);
 
-			var logger = NLog.LogManager.GetCurrentClassLogger();
+			var logger = NLog.LogManager.GetLogger("Default");
 
 			logger.Info("Starting execution.");
 
-			var client = new LicenseClient(logger);
-			using (var db = new ApplicationDbContext())
-			using (var service = new LicenseService(db))
+			try
 			{
-				var transaction = db.Database.BeginTransaction(System.Data.IsolationLevel.ReadUncommitted);
-
-				client.GetLicenses((license) =>
+				var client = new LicenseClient(logger);
+				using (var db = new ApplicationDbContext())
+				using (var service = new LicenseService(db))
 				{
-					var task = service.Upsert(license.LicenseNumber, license.BusinessName, license.LegalName,
-						license.LocationAddress, license.City, license.LicenseType, license.OpenDate,
-						license.CloseDate, license.LbdWholesaler, seenOn);
-					task.Wait();
-				}, () =>
-				{
-					transaction.Commit();
+					var transaction = db.Database.BeginTransaction(System.Data.IsolationLevel.ReadUncommitted);
 
-					transaction = db.Database.BeginTransaction(System.Data.IsolationLevel.ReadUncommitted);
-				});
+					client.GetLicenses((license) =>
+					{
+						var task = service.Upsert(license.LicenseNumber, license.BusinessName, license.LegalName,
+							license.LocationAddress, license.City, license.LicenseType, license.OpenDate,
+							license.CloseDate, license.LbdWholesaler, seenOn);
+						task.Wait();
+					}, () =>
+					{
+						transaction.Commit();
 
+						transaction = db.Database.BeginTransaction(System.Data.IsolationLevel.ReadUncommitted);
+					});
+
+				}
+			}
+			catch (Exception e)
+			{
+				logger.Error(e, "Execution failed!");
 			}
 
 			logger.Info("Completed execution.");
