@@ -39,12 +39,13 @@ namespace SCAlcoholLicenses.Client
 
 			browser.Navigate().GoToUrl("https://mydorway.dor.sc.gov/");
 
-			// wait for everything to load
+			// wait for everything to load - that is, until we can see the link we want to click on
 			wait.Until(driver =>
 			{
 				try
 				{
-					driver.FindElement(By.Id("caption2_d-a1"));
+				    driver.FindElement(By.XPath(
+				        "//span[ contains( @class, 'CaptionLinkText' ) and contains( text(), 'Alcohol License Locations' ) ]"));
 					return true;
 				}
 				catch
@@ -56,9 +57,11 @@ namespace SCAlcoholLicenses.Client
 			_logger.Debug("Clicking ABL licenses link");
 
 			// click on the link to get to the ABL licenses page
-			browser.FindElementById("caption2_d-a1").Click();
+		    browser.FindElementByXPath(
+		            "//span[ contains( @class, 'CaptionLinkText' ) and contains( text(), 'Alcohol License Locations' ) ]")
+		        .Click();
 
-			// wait until the page loads
+			// wait until the page loads and the search button is visible
 			wait.Until(driver =>
 			{
 				try
