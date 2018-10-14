@@ -148,7 +148,7 @@ namespace SCAlcoholLicenses.Client
 				
 				if (currentPage >= totalPages)
 				{
-					_logger.Debug("Current page " + currentPage + " is > than " + totalPages + " total pages, stopping.");
+					_logger.Debug("Current page " + currentPage + " is >= than " + totalPages + " total pages, stopping.");
 
 					keepGoing = false;
 				}
