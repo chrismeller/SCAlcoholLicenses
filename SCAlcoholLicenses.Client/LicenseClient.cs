@@ -44,8 +44,8 @@ namespace SCAlcoholLicenses.Client
 			{
 				try
 				{
-				    driver.FindElement(By.XPath(
-				        "//span[ contains( @class, 'CaptionLinkText' ) and contains( text(), 'Alcohol License Locations' ) ]"));
+					driver.FindElement(By.XPath(
+						"//span[ contains( @class, 'CaptionLinkText' ) and contains( text(), 'Alcohol License Locations' ) ]"));
 					return true;
 				}
 				catch
@@ -57,9 +57,9 @@ namespace SCAlcoholLicenses.Client
 			_logger.Debug("Clicking ABL licenses link");
 
 			// click on the link to get to the ABL licenses page
-		    browser.FindElementByXPath(
-		            "//span[ contains( @class, 'CaptionLinkText' ) and contains( text(), 'Alcohol License Locations' ) ]")
-		        .Click();
+			browser.FindElementByXPath(
+					"//span[ contains( @class, 'CaptionLinkText' ) and contains( text(), 'Alcohol License Locations' ) ]")
+				.Click();
 
 			// wait until the page loads and the search button is visible
 			wait.Until(driver =>
@@ -143,9 +143,9 @@ namespace SCAlcoholLicenses.Client
 				// get the current page number
 				var pageInfo = browser.FindElementById("d-k_pgof").Text.Replace(",", "");
 
-				var currentPage = Convert.ToInt32(pageInfo.Split(new[] {" of "}, StringSplitOptions.None).First());
-				var totalPages = Convert.ToInt32(pageInfo.Split(new[] {" of "}, StringSplitOptions.None).Last());
-				
+				var currentPage = Convert.ToInt32(pageInfo.Split(new[] { " of " }, StringSplitOptions.None).First());
+				var totalPages = Convert.ToInt32(pageInfo.Split(new[] { " of " }, StringSplitOptions.None).Last());
+
 				if (currentPage >= totalPages)
 				{
 					_logger.Debug("Current page " + currentPage + " is >= than " + totalPages + " total pages, stopping.");
@@ -178,7 +178,7 @@ namespace SCAlcoholLicenses.Client
 					}
 
 					var pageInfo = driver.FindElement(By.Id("d-k_pgof")).Text.Replace(",", "");
-					var currentPage = Convert.ToInt32(pageInfo.Split(new[] {" of "}, StringSplitOptions.None).First());
+					var currentPage = Convert.ToInt32(pageInfo.Split(new[] { " of " }, StringSplitOptions.None).First());
 
 					if (currentPage < page)
 					{
