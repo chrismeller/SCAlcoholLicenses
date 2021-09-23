@@ -1,12 +1,12 @@
-﻿using System;
+﻿using SCAlcoholLicenses.Data;
+using SCAlcoholLicenses.Data.Models;
+using System;
 using System.Data.Entity;
 using System.Threading.Tasks;
-using SCAlcoholLicenses.Data;
-using SCAlcoholLicenses.Data.Models;
 
 namespace SCAlcoholLicenses.Domain
 {
-	public class LicenseService : IDisposable
+    public class LicenseService : IDisposable
 	{
 		private ApplicationDbContext _db;
 

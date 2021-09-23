@@ -1,23 +1,18 @@
-﻿using System;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Transactions;
-using SCAlcoholLicenses.Client;
+﻿using SCAlcoholLicenses.Client;
 using SCAlcoholLicenses.Data;
-using SCAlcoholLicenses.Data.Models;
 using SCAlcoholLicenses.Domain;
+using System;
+using System.Threading.Tasks;
 
 namespace SCAlcoholLicenses.Host
 {
 	class Program
 	{
-		static void Main(string[] args)
+		static async Task Main(string[] args)
 		{
-			Run().ConfigureAwait(false).GetAwaiter().GetResult();
-		}
+			//var binaryLocation = @"C:\Program Files\Google\Chrome Beta\Application\chrome.exe";
+			var binaryLocation = @"C:\Users\chris\scoop\apps\firefox-developer\current\firefox.exe";
 
-		private static async Task Run()
-		{
 			// midnight, yo
 			var seenOn = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, DateTime.UtcNow.Day);
 
@@ -27,26 +22,24 @@ namespace SCAlcoholLicenses.Host
 
 			try
 			{
-				var client = new LicenseClient(logger);
-				using (var db = new ApplicationDbContext())
-				using (var service = new LicenseService(db))
+				using var client = new LicenseClient(logger, "", binaryLocation);
+				using var db = new ApplicationDbContext();
+				using var service = new LicenseService(db);
+
+				var transaction = await db.Database.BeginTransactionAsync();
+
+				client.GetLicenses((license) =>
 				{
-					var transaction = db.Database.BeginTransaction(System.Data.IsolationLevel.ReadUncommitted);
+					var task = service.Upsert(license.LicenseNumber, license.BusinessName, license.LegalName,
+						license.LocationAddress, license.City, license.LicenseType, license.OpenDate,
+						license.CloseDate, license.LbdWholesaler, seenOn);
+					task.Wait();
+				}, () =>
+				{
+					transaction.Commit();
 
-					client.GetLicenses((license) =>
-					{
-						var task = service.Upsert(license.LicenseNumber, license.BusinessName, license.LegalName,
-							license.LocationAddress, license.City, license.LicenseType, license.OpenDate,
-							license.CloseDate, license.LbdWholesaler, seenOn);
-						task.Wait();
-					}, () =>
-					{
-						transaction.Commit();
-
-						transaction = db.Database.BeginTransaction(System.Data.IsolationLevel.ReadUncommitted);
-					});
-
-				}
+					transaction = db.Database.BeginTransaction();
+				});
 			}
 			catch (Exception e)
 			{
