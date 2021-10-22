@@ -1,6 +1,9 @@
-﻿using SCAlcoholLicenses.Data;
+﻿using Dapper;
+using Microsoft.EntityFrameworkCore.Storage;
+using SCAlcoholLicenses.Data;
 using SCAlcoholLicenses.Data.Models;
 using System;
+using System.Data.Common;
 using System.Data.Entity;
 using System.Threading.Tasks;
 
@@ -8,72 +11,80 @@ namespace SCAlcoholLicenses.Domain
 {
     public class LicenseService : IDisposable
 	{
-		private ApplicationDbContext _db;
+		private DbConnection _db;
 
 		public LicenseService(ApplicationDbContext db)
 		{
-			_db = db;
+			_db = db.GetDbConnection();
 		}
 
-		public void Create(string licenseNumber, string businessName, string legalName, string locationAddress, string city, string licenseType, DateTime openDate, DateTime closeDate, bool lbdWholesaler, DateTime now)
+		public async Task Create(string licenseNumber, string businessName, string legalName, string locationAddress, string city, string licenseType, DateTime openDate, DateTime closeDate, bool lbdWholesaler, DateTimeOffset now)
 		{
-			var license = new License()
-			{
-				Id = Guid.NewGuid(),
-				LicenseNumber = licenseNumber,
-				BusinessName = businessName,
-				LegalName = legalName,
-				LocationAddress = locationAddress,
-				City = city,
-				LicenseType = licenseType,
-				OpenDate = openDate,
-				CloseDate = closeDate,
-				LbdWholesaler = lbdWholesaler,
-				FirstSeen = now,
-				LastSeen = now,
-			};
-
-			_db.Licenses.Add(license);
+			await _db.ExecuteAsync(@"
+insert into Licenses
+	(Id, LicenseNumber, BusinessName, LegalName, LocationAddress, City, LicenseType, OpenDate, CloseDate, LbdWholesaler, FirstSeen, LastSeen)
+values
+	(@Id, @LicenseNumber, @BusinessName, @LegalName, @LocationAddress, @City, @LicenseType, @OpenDate, @CloseDate, @LbdWholesaler, @FirstSeen, @LastSeen)",
+	new
+    {
+		Id = Guid.NewGuid(),
+		LicenseNumber = licenseNumber,
+		BusinessName = businessName,
+		LegalName = legalName,
+		LocationAddress = locationAddress,
+		City = city,
+		LicenseType = licenseType,
+		OpenDate = openDate,
+		CloseDate = closeDate,
+		LbdWholesaler = lbdWholesaler,
+		FirstSeen = now,
+		LastSeen = now,
+	});
 		}
 
-		public async Task<bool> Get(string licenseNumber, DateTime openDate)
+		public async Task<License> Get(string licenseNumber, DateTime openDate)
 		{
-			var exists =
-				await _db.Licenses.FirstOrDefaultAsync(x => x.LicenseNumber == licenseNumber && x.OpenDate == openDate);
+			var exists = await _db.QueryFirstOrDefaultAsync<License>("select * from Licenses where LicenseNumber = @LicenseNumber and OpenDate = @OpenDate", new { LicenseNumber = licenseNumber, OpenDate = openDate });
 
-			if (exists == null)
-			{
-				return false;
-			}
+			return exists;
+		}
 
-			return true;
+		public async Task<bool> Exists(string licenseNumber, DateTime openDate) {
+			var existing = await Get(licenseNumber, openDate);
+			return existing != null;
 		}
 
 		public async Task Upsert(string licenseNumber, string businessName, string legalName, string locationAddress,
-			string city, string licenseType, DateTime openDate, DateTime closeDate, bool lbdWholesaler, DateTime now)
+			string city, string licenseType, DateTime openDate, DateTime closeDate, bool lbdWholesaler, DateTimeOffset now)
 		{
-			var existing =
-				await _db.Licenses.FirstOrDefaultAsync(x => x.LicenseNumber == licenseNumber && x.OpenDate == openDate);
+			var existing = await Get(licenseNumber, openDate);
 
 			if (existing != null)
 			{
-				existing.LicenseNumber = licenseNumber;
-				existing.BusinessName = businessName;
-				existing.LegalName = legalName;
-				existing.LocationAddress = locationAddress;
-				existing.City = city;
-				existing.LicenseType = licenseType;
-				existing.OpenDate = openDate;
-				existing.CloseDate = closeDate;
-				existing.LbdWholesaler = lbdWholesaler;
-				existing.LastSeen = now;
+				await _db.ExecuteAsync(@"
+update Licenses set
+	LicenseNumber = @LicenseNumber, BusinessName = @BusinessName, LegalName = @LegalName,
+	LocationAddress = @LocationAddress, City = @City, LicenseType = @LicenseType, OpenDate = @OpenDate, CloseDate = @CloseDate,
+	LbdWholesaler = @LbdWholesaler, LastSeen = @LastSeen
+where LicenseNumber = @LicenseNumber and OpenDate = @OpenDate",
+					new
+                    {
+						LicenseNumber = licenseNumber,
+						BusinessName = businessName,
+						LegalName = legalName,
+						LocationAddress = locationAddress,
+						City = city,
+						LicenseType = licenseType,
+						OpenDate = openDate,
+						CloseDate = closeDate,
+						LbdWholesaler = lbdWholesaler,
+						LastSeen = now,
+                    });
 			}
 			else
 			{
-				Create(licenseNumber, businessName, legalName, locationAddress, city, licenseType, openDate, closeDate, lbdWholesaler, now);
+				await Create(licenseNumber, businessName, legalName, locationAddress, city, licenseType, openDate, closeDate, lbdWholesaler, now);
 			}
-
-			await _db.SaveChangesAsync();
 		}
 
 		public void Dispose()

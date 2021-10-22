@@ -1,12 +1,14 @@
-﻿using NLog;
+﻿using ExcelDataReader;
+using NLog;
+using OfficeOpenXml;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.IO;
 using System.Threading;
-using OpenQA.Selenium.Firefox;
+using System.Threading.Tasks;
 
 namespace SCAlcoholLicenses.Client
 {
@@ -26,203 +28,113 @@ namespace SCAlcoholLicenses.Client
             _binaryLocation = binaryLocation;
         }
 
-        public void GetLicenses(Action<AlcoholLicense> recordCallback, Action pageCallback)
+        public string GetLicenseFile()
         {
-            _logger.Debug("Starting Chrome with arguments: " + _chromeArgs);
-            _logger.Debug("Starting Chrome with binary location: " + _binaryLocation);
+            var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            Directory.CreateDirectory(tempDir);
 
-            //var chromeOptions = new ChromeOptions
-            //{
-            //    Proxy = new Proxy()
-            //    {
-            //        //SocksProxy = "socks5://us9333.nordvpn.com",
-            //        //SocksProxy = "us9235.nordvpn.com",
-            //        SocksProxy = "localhost:1080",
-            //        //SocksUserName = "tYoFPfS7JjADyCMnLy65RCoq",
-            //        //SocksPassword = "6CWdFxx4gaDwiq6oxdFz7jN6",
-            //        SocksVersion = 5,
-            //        //SslProxy = "tYoFPfS7JjADyCMnLy65RCoq:6CWdFxx4gaDwiq6oxdFz7jN6@us9235.nordvpn.com",
-            //    }
-            //};
+            _logger.Debug($"Starting Chrome with arguments: {_chromeArgs}");
+            _logger.Debug($"Starting Chrome with binary location: {_binaryLocation}");
+            _logger.Debug($"Using download directory: {tempDir}");
 
-            var chromeOptions = new FirefoxOptions
-            {
-                //Proxy = new Proxy
-                //{
-                //    //SocksProxy = "us.socks.nordhold.net",
-                //    SocksProxy = "localhost:1080",
-                //    //SocksUserName = "tYoFPfS7JjADyCMnLy65RCoq",
-                //    //SocksPassword = "6CWdFxx4gaDwiq6oxdFz7jN6",
-                //    SocksVersion = 5,
-                //},
-            };
+            var chromeOptions = new ChromeOptions();
+            chromeOptions.AddUserProfilePreference("download.default_directory", tempDir);
 
-            if (_chromeArgs != "") chromeOptions.AddArguments(_chromeArgs.Split(','));
-            //if (_binaryLocation != "") chromeOptions.BinaryLocation = _binaryLocation;
-            if (_binaryLocation != "") chromeOptions.BrowserExecutableLocation = _binaryLocation;
+            if (!string.IsNullOrEmpty(_chromeArgs)) chromeOptions.AddArguments(_chromeArgs.Split(','));
+            if (!string.IsNullOrEmpty(_binaryLocation)) chromeOptions.BinaryLocation = _binaryLocation;
 
-            //_browser = new ChromeDriver(chromeOptions);
-            _browser = new FirefoxDriver(chromeOptions);
+            _browser = new ChromeDriver(chromeOptions);
 
             var wait = new WebDriverWait(_browser, TimeSpan.FromSeconds(20));
 
             _logger.Debug("Navigating to MyDORWay");
 
-            _browser.Navigate().GoToUrl("https://mydorway.dor.sc.gov/");
+            _browser.Navigate().GoToUrl("https://mydorway.dor.sc.gov");
 
-            // wait for everything to load - that is, until we can see the link we want to click on
-            wait.Until(driver =>
-            {
-                try
+            // wait until the page has loaded - that is, until we can see the link we want to click on, then click on it
+            _logger.Debug("Clicking on Alcohol Licenses link");
+            wait.Until(b => b.FindElement(By.XPath("//span[ contains( text(), 'Alcohol License Locations' ) ]"))).Click();
+
+            // wait for the search button to be visible and click it to submit the form
+            _logger.Debug("Clicking on Search button");
+            wait.Until(b => b.FindElement(By.XPath("//span[ contains( text(), 'SEARCH' ) ]/ancestor::button"))).Click();
+
+            // set up our file watcher so we can tell when the download is complete
+            _logger.Debug("Starting file watcher");
+            var watcher = new FileSystemWatcher(tempDir, "*.xlsx");
+
+            // wait for the export data button to be visible and click it
+            _logger.Debug("Clicking Export link");
+            wait.Until(b => {
+                var el = b.FindElement(By.XPath("//span[ contains( text(), 'Export Data' ) ]/ancestor::li"));
+                if (el.GetCssValue("display") != "none")
                 {
-                    driver.FindElement(By.XPath(
-                        "//span[ contains( text(), 'Alcohol License Locations' ) ]"));
-                    return true;
-                }
-                catch
-                {
-                    return false;
-                }
-            });
-
-            _logger.Debug("Clicking ABL licenses link");
-
-            // click on the link to get to the ABL licenses page
-            _browser.FindElement(By.XPath(
-                    "//span[ contains( text(), 'Alcohol License Locations' ) ]"))
-                .Click();
-
-            // wait until the page loads and the search button is visible
-            wait.Until(driver =>
-            {
-                try
-                {
-                    driver.FindElement(By.XPath("//span[ contains( text(), 'SEARCH' ) ]/ancestor::button"));
-                    return true;
-                }
-                catch
-                {
-                    return false;
-                }
-            });
-
-            _logger.Debug("Clicking search button");
-
-            // click on the search button
-            _browser.FindElement(By.XPath("//span[ contains( text(), 'SEARCH' ) ]/ancestor::button")).Click();
-
-            // wait for results to load
-            WaitForResultsToLoad(wait);
-
-            _logger.Debug("Starting loop...");
-
-            var keepGoing = true;
-            do
-            {
-                var licenseNumbers = _browser.FindElements(By.ClassName("d-b"));
-                var businessNames = _browser.FindElements(By.ClassName("d-c"));
-                var legalNames = _browser.FindElements(By.ClassName("d-d"));
-                var locationAddresses = _browser.FindElements(By.ClassName("d-e"));
-                var cities = _browser.FindElements(By.ClassName("d-f"));
-                var licenseTypes = _browser.FindElements(By.ClassName("d-g"));
-                var openDates = _browser.FindElements(By.ClassName("d-h"));
-                var closeDates = _browser.FindElements(By.ClassName("d-i"));
-                var lbdWholesalers = _browser.FindElements(By.XPath("//td[ contains( @class, 'd-j' ) ]//input"));
-
-                _logger.Debug("Got " + licenseNumbers.Count + " records");
-
-                var licenses = new List<AlcoholLicense>();
-                for (var i = 0; i < licenseNumbers.Count; i++)
-                {
-                    var licenseNumber = licenseNumbers[i];
-                    var businessName = businessNames[i];
-                    var legalName = legalNames[i];
-                    var locationAddress = locationAddresses[i];
-                    var city = cities[i];
-                    var licenseType = licenseTypes[i];
-                    var openDate = openDates[i];
-                    var closeDate = closeDates[i];
-                    var lbdWholesaler = lbdWholesalers[i];
-
-                    var license = new AlcoholLicense()
-                    {
-                        LicenseNumber = licenseNumber.Text,
-                        BusinessName = businessName.Text,
-                        LegalName = legalName.Text,
-                        LocationAddress = locationAddress.Text,
-                        City = city.Text,
-                        LicenseType = licenseType.Text,
-                        OpenDate = DateTime.Parse(openDate.Text),
-                        CloseDate = DateTime.Parse(closeDate.Text),
-                        LbdWholesaler = lbdWholesaler.Selected,
-                    };
-
-                    licenses.Add(license);
+                    return el;
                 }
 
-                _logger.Debug("Parsing complete");
+                return null;
+            }).Click();
 
-                foreach (var license in licenses)
-                {
-                    recordCallback(license);
-                }
+            // just wait until the watcher triggers
+            var changedFile = watcher.WaitForChanged(WatcherChangeTypes.Changed);
 
-                pageCallback();
+            return Path.Combine(tempDir, changedFile.Name);
 
-                _logger.Debug("Page complete");
-
-                // get the current page number
-                var pageInfo = _browser.FindElement(By.Id("d-k_pgof")).Text.Replace(",", "");
-
-                var currentPage = Convert.ToInt32(pageInfo.Split(new[] { " of " }, StringSplitOptions.None).First());
-                var totalPages = Convert.ToInt32(pageInfo.Split(new[] { " of " }, StringSplitOptions.None).Last());
-
-                if (currentPage >= totalPages)
-                {
-                    _logger.Debug("Current page " + currentPage + " is >= than " + totalPages + " total pages, stopping.");
-
-                    keepGoing = false;
-                }
-                else
-                {
-                    _logger.Debug("Navigating to page " + (currentPage + 1));
-
-                    _browser.FindElement(By.Id("d-k_pgnext")).Click();
-
-                    WaitForResultsToLoad(wait, currentPage + 1);
-                }
-
-            } while (keepGoing);
         }
 
-        private void WaitForResultsToLoad(WebDriverWait wait, int page = 1)
+        public IEnumerable<AlcoholLicense> ParseLicenses(string licenseFilePath)
         {
-            wait.Until(driver =>
+            // we loop and wait for an exclusive read lock to make sure the file is done writing
+            _logger.Debug("Waiting for file lock");
+            using var stream = WaitForLock(licenseFilePath, FileMode.Open, FileAccess.Read, FileShare.None);
+            using var reader = ExcelReaderFactory.CreateReader(stream);
+
+            do
             {
+                while (reader.Read())
+                {
+                    // if this is the header row, just skip ahead
+                    if (reader.GetString(0) == "License Number") continue;
+
+                    var license = new AlcoholLicense
+                    {
+                        LicenseNumber = reader.GetString(0),
+                        BusinessName = reader.GetString(1),
+                        LegalName = reader.GetString(2),
+                        LocationAddress = reader.GetString(3),
+                        City = reader.GetString(4),
+                        LicenseType = reader.GetString(5),
+                        OpenDate = reader.GetDateTime(6),
+                        CloseDate = reader.GetDateTime(7),
+                        LbdWholesaler = reader.GetBoolean(8),
+                    };
+
+                    yield return license;
+                }
+            } while (reader.NextResult());
+        }
+
+        private FileStream WaitForLock(string path, FileMode mode, FileAccess access, FileShare share)
+        {
+            for(var tries = 0; tries < 100; tries++)
+            {
+                FileStream stream = null;
                 try
                 {
-                    var spinner = driver.FindElement(By.Id("FastBusySpinner"));
-
-                    if (spinner.Displayed)
-                    {
-                        return false;
-                    }
-
-                    var pageInfo = driver.FindElement(By.Id("d-k_pgof")).Text.Replace(",", "");
-                    var currentPage = Convert.ToInt32(pageInfo.Split(new[] { " of " }, StringSplitOptions.None).First());
-
-                    if (currentPage < page)
-                    {
-                        return false;
-                    }
-
-                    return true;
+                    stream = File.Open(path, mode, access, share);
+                    return stream;
                 }
-                catch
+                catch (Exception)
                 {
-                    return false;
+                    if (stream != null)
+                    {
+                        stream.Dispose();
+                    }
+                    Thread.Sleep(100);
                 }
-            });
+            }
+
+            return null;
         }
 
         public void Dispose()

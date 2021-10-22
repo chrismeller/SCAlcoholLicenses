@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using SCAlcoholLicenses.Data.Models;
+using System.Data.Common;
 
 namespace SCAlcoholLicenses.Data
 {
@@ -9,5 +10,10 @@ namespace SCAlcoholLicenses.Data
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) => optionsBuilder.UseSqlServer(
             "Data Source=localhost; Initial Catalog=SCAlcoholLicenses; User Id=SCAlcoholLicenses; Password=SCAlcoholLicenses;");
+
+        public DbConnection GetDbConnection ()
+        {
+            return this.Database.GetDbConnection();
+        }
     }
 }

@@ -21,7 +21,7 @@ namespace SCAlcoholLicenses.Data.Models
 		public DateTime CloseDate { get; set; }
 		public bool LbdWholesaler { get; set; }
 
-		public DateTime FirstSeen { get; set; }
-		public DateTime LastSeen { get; set; }
+		public DateTimeOffset FirstSeen { get; set; }
+		public DateTimeOffset LastSeen { get; set; }
 	}
 }
