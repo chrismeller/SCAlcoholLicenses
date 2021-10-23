@@ -1,0 +1,41 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net5.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DefineConstants>TRACE;DEBUG;_PUBLISH_CHROMEDRIVER</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="NLog.config">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <None Update="NLog.xsd">
+      <SubType>Designer</SubType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SCAlcoholLicenses.Client\SCAlcoholLicenses.Client.csproj" />
+    <ProjectReference Include="..\SCAlcoholLicenses.Data\SCAlcoholLicenses.Data.csproj" />
+    <ProjectReference Include="..\SCAlcoholLicenses.Domain\SCAlcoholLicenses.Domain.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="5.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="5.0.11">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+    <PackageReference Include="NLog" Version="5.0.0-preview.1" />
+    <PackageReference Include="NLog.Config" Version="4.7.11" />
+    <PackageReference Include="NLog.Schema" Version="5.0.0-preview.1" />
+    <PackageReference Include="Selenium.WebDriver.ChromeDriver" Version="95.0.4638.1700" />
+    <PackageReference Include="Sentry.NLog" Version="3.10.0" />
+    <PackageReference Include="System.ComponentModel.Annotations" Version="6.0.0-preview.4.21253.7" />
+    <PackageReference Include="System.Data.DataSetExtensions" Version="4.6.0-preview3.19128.7" />
+  </ItemGroup>
+  <Import Project="..\packages\Selenium.WebDriver.ChromeDriver.2.41.0\build\Selenium.WebDriver.ChromeDriver.targets" Condition="Exists('..\packages\Selenium.WebDriver.ChromeDriver.2.41.0\build\Selenium.WebDriver.ChromeDriver.targets')" />
+</Project>
