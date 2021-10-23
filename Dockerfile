@@ -1,4 +1,10 @@
+FROM mcr.microsoft.com/dotnet/runtime:5.0 AS base
+
+RUN useradd dotnet
+
+
 FROM mcr.microsoft.com/dotnet/sdk:5.0 AS build
+
 WORKDIR /source
 
 # copy only the solution and project files to reduce the chances the layer will be invalidated
@@ -22,8 +28,14 @@ COPY ./src/SCAlcoholLicenses.Host/* ./src/SCAlcoholLicenses.Host/
 RUN dotnet publish -c release -o /app --no-restore ./src/SCAlcoholLicenses.Host
 
 # copy all our build artifacts over
-FROM mcr.microsoft.com/dotnet/runtime:5.0 AS release
+FROM base AS release
 WORKDIR /app
 COPY --from=build /app ./
+
+# make sure everything is owned by the right user
+RUN chown -R dotnet:dotnet /app
+
+# and run our app as that user
+USER dotnet
 
 ENTRYPOINT ["dotnet", "SCAlcoholLicenses.Host.dll"]
