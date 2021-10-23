@@ -28,11 +28,11 @@ namespace SCAlcoholLicenses.Host
 			{
 				using var client = new LicenseClient(logger, "", binaryLocation);
 				using var db = new ApplicationDbContext();
-				using var service = new LicenseService(db);
-
-				var transaction = new TransactionScope();
+				var service = new LicenseService(db);
 
 				await db.GetDbConnection().OpenAsync();
+
+				var transaction = await db.GetDbConnection().BeginTransactionAsync();
 
 				logger.Info("Getting License file");
 
@@ -46,15 +46,15 @@ namespace SCAlcoholLicenses.Host
 
                     await service.Upsert(license.LicenseNumber, license.BusinessName, license.LegalName,
                         license.LocationAddress, license.City, license.LicenseType, license.OpenDate,
-                        license.CloseDate, license.LbdWholesaler, seenOn);
+                        license.CloseDate, license.LbdWholesaler, seenOn, transaction);
 
                     recordsUpserted++;
 
                     if (recordsUpserted % 100 == 0)
                     {
-                        transaction.Complete();
-						transaction = new TransactionScope();
-                    }
+                        await transaction.CommitAsync();
+						transaction = await db.GetDbConnection().BeginTransactionAsync();
+					}
                 }
             }
 			catch (Exception e)
@@ -76,11 +76,11 @@ namespace SCAlcoholLicenses.Host
 			{
 				using var client = new LicenseClient(logger, "", null);
 				using var db = new ApplicationDbContext();
-				using var service = new LicenseService(db);
-
-				var transaction = new TransactionScope();
+				var service = new LicenseService(db);
 
 				await db.GetDbConnection().OpenAsync();
+
+				var transaction = await db.GetDbConnection().BeginTransactionAsync();
 
 				logger.Info("Getting License file");
 
@@ -92,20 +92,20 @@ namespace SCAlcoholLicenses.Host
 
 					await service.Upsert(license.LicenseNumber, license.BusinessName, license.LegalName,
 						license.LocationAddress, license.City, license.LicenseType, license.OpenDate,
-						license.CloseDate, license.LbdWholesaler, seenOn);
+						license.CloseDate, license.LbdWholesaler, seenOn, transaction);
 
 					recordsUpserted++;
 
-					if (recordsUpserted % 100 == 0)
+					if (recordsUpserted % 1000 == 0)
 					{
-						logger.Debug("Completing transaction");
+						logger.Debug($"Completing transaction. Total records: {recordsUpserted}");
 
-						transaction.Complete();
-						transaction = new TransactionScope();
+						await transaction.CommitAsync();
+						transaction = await db.GetDbConnection().BeginTransactionAsync();
 					}
 				}
 
-				transaction.Complete();
+				await transaction.CommitAsync();
 			}
 			catch (Exception e)
 			{

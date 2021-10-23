@@ -1,15 +1,13 @@
 ﻿using Dapper;
-using Microsoft.EntityFrameworkCore.Storage;
 using SCAlcoholLicenses.Data;
 using SCAlcoholLicenses.Data.Models;
 using System;
 using System.Data.Common;
-using System.Data.Entity;
 using System.Threading.Tasks;
 
 namespace SCAlcoholLicenses.Domain
 {
-    public class LicenseService : IDisposable
+    public class LicenseService
 	{
 		private DbConnection _db;
 
@@ -18,7 +16,7 @@ namespace SCAlcoholLicenses.Domain
 			_db = db.GetDbConnection();
 		}
 
-		public async Task Create(string licenseNumber, string businessName, string legalName, string locationAddress, string city, string licenseType, DateTime openDate, DateTime closeDate, bool lbdWholesaler, DateTimeOffset now)
+		public async Task Create(string licenseNumber, string businessName, string legalName, string locationAddress, string city, string licenseType, DateTime openDate, DateTime closeDate, bool lbdWholesaler, DateTimeOffset now, DbTransaction transaction)
 		{
 			await _db.ExecuteAsync(@"
 insert into Licenses
@@ -39,25 +37,25 @@ values
 		LbdWholesaler = lbdWholesaler,
 		FirstSeen = now,
 		LastSeen = now,
-	});
+	}, transaction);
 		}
 
-		public async Task<License> Get(string licenseNumber, DateTime openDate)
+		public async Task<License> Get(string licenseNumber, DateTime openDate, DbTransaction transaction)
 		{
-			var exists = await _db.QueryFirstOrDefaultAsync<License>("select * from Licenses where LicenseNumber = @LicenseNumber and OpenDate = @OpenDate", new { LicenseNumber = licenseNumber, OpenDate = openDate });
+			var exists = await _db.QueryFirstOrDefaultAsync<License>("select * from Licenses where LicenseNumber = @LicenseNumber and OpenDate = @OpenDate", new { LicenseNumber = licenseNumber, OpenDate = openDate }, transaction);
 
 			return exists;
 		}
 
-		public async Task<bool> Exists(string licenseNumber, DateTime openDate) {
-			var existing = await Get(licenseNumber, openDate);
+		public async Task<bool> Exists(string licenseNumber, DateTime openDate, DbTransaction transaction) {
+			var existing = await Get(licenseNumber, openDate, transaction);
 			return existing != null;
 		}
 
 		public async Task Upsert(string licenseNumber, string businessName, string legalName, string locationAddress,
-			string city, string licenseType, DateTime openDate, DateTime closeDate, bool lbdWholesaler, DateTimeOffset now)
+			string city, string licenseType, DateTime openDate, DateTime closeDate, bool lbdWholesaler, DateTimeOffset now, DbTransaction transaction)
 		{
-			var existing = await Get(licenseNumber, openDate);
+			var existing = await Get(licenseNumber, openDate, transaction);
 
 			if (existing != null)
 			{
@@ -79,17 +77,12 @@ where LicenseNumber = @LicenseNumber and OpenDate = @OpenDate",
 						CloseDate = closeDate,
 						LbdWholesaler = lbdWholesaler,
 						LastSeen = now,
-                    });
+                    }, transaction);
 			}
 			else
 			{
-				await Create(licenseNumber, businessName, legalName, locationAddress, city, licenseType, openDate, closeDate, lbdWholesaler, now);
+				await Create(licenseNumber, businessName, legalName, locationAddress, city, licenseType, openDate, closeDate, lbdWholesaler, now, transaction);
 			}
-		}
-
-		public void Dispose()
-		{
-			_db?.Dispose();
 		}
 	}
 }
