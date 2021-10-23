@@ -1,0 +1,45 @@
+version: '3.4'
+
+volumes:
+  downloads:
+  db_data:
+
+services:
+  selenium:
+    image: selenium/standalone-chrome
+    ports:
+      - 4444:4444
+    shm_size: 2gb
+    restart: always
+    volumes:
+      - downloads:/downloads
+
+  db:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    ports:
+      - 1433:1433
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=Microsoft2021!
+      - MSSQL_PID=Developer
+      - TZ=Utc
+    volumes:
+      - db_data:/var/opt/mssql/data
+      - ./db-init/
+
+  app:
+    image: scalcohollicenses:latest
+    build: ./
+    environment:
+      - SELENIUM_REMOTE_URI=http://selenium:4444
+      - DB_HOST=db
+      - DB_USER=sa
+      - DB_PASS=Microsoft2021!
+      - DB_NAME=SCAlcoholLicenses
+      - TZ=Utc
+    restart: always
+    volumes:
+      - downloads:/downloads
+    depends_on:
+      - selenium
+      - db
