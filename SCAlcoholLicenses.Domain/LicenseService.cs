@@ -40,22 +40,22 @@ values
 	}, transaction);
 		}
 
-		public async Task<License> Get(string licenseNumber, DateTime openDate, DbTransaction transaction)
+		public async Task<License> Get(string licenseNumber, string licenseType, DateTime openDate, DbTransaction transaction)
 		{
-			var exists = await _db.QueryFirstOrDefaultAsync<License>("select * from Licenses where LicenseNumber = @LicenseNumber and OpenDate = @OpenDate", new { LicenseNumber = licenseNumber, OpenDate = openDate }, transaction);
+			var exists = await _db.QueryFirstOrDefaultAsync<License>("select * from Licenses where LicenseNumber = @LicenseNumber and LicenseType = @LicenseType and OpenDate = @OpenDate", new { LicenseNumber = licenseNumber, LicenseType = licenseType, OpenDate = openDate }, transaction);
 
 			return exists;
 		}
 
-		public async Task<bool> Exists(string licenseNumber, DateTime openDate, DbTransaction transaction) {
-			var existing = await Get(licenseNumber, openDate, transaction);
+		public async Task<bool> Exists(string licenseNumber, string licenseType, DateTime openDate, DbTransaction transaction) {
+			var existing = await Get(licenseNumber, licenseType, openDate, transaction);
 			return existing != null;
 		}
 
 		public async Task Upsert(string licenseNumber, string businessName, string legalName, string locationAddress,
 			string city, string licenseType, DateTime openDate, DateTime closeDate, bool lbdWholesaler, DateTimeOffset now, DbTransaction transaction)
 		{
-			var existing = await Get(licenseNumber, openDate, transaction);
+			var existing = await Get(licenseNumber, licenseType, openDate, transaction);
 
 			if (existing != null)
 			{
