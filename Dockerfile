@@ -18,9 +18,6 @@ COPY ./src/SCAlcoholLicenses.Data/* ./src/SCAlcoholLicenses.Data/
 COPY ./src/SCAlcoholLicenses.Domain/* ./src/SCAlcoholLicenses.Domain/
 COPY ./src/SCAlcoholLicenses.Host/* ./src/SCAlcoholLicenses.Host/
 
-# make sure everything is clean in case we copied over some build artifacts
-RUN dotnet clean
-
 # publish
 RUN dotnet publish -c release -o /app --no-restore ./src/SCAlcoholLicenses.Host
 
