@@ -1,5 +1,4 @@
 ﻿using Dapper;
-using SCAlcoholLicenses.Data;
 using SCAlcoholLicenses.Data.Models;
 using System;
 using System.Data.Common;
@@ -11,9 +10,9 @@ namespace SCAlcoholLicenses.Domain
 	{
 		private DbConnection _db;
 
-		public LicenseService(ApplicationDbContext db)
+		public LicenseService(DbConnection db)
 		{
-			_db = db.GetDbConnection();
+			_db = db;
 		}
 
 		public async Task Create(string licenseNumber, string businessName, string legalName, string locationAddress, string city, string licenseType, DateTime openDate, DateTime closeDate, bool lbdWholesaler, DateTimeOffset now, DbTransaction transaction)

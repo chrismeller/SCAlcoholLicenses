@@ -1,65 +1,59 @@
-﻿using SCAlcoholLicenses.Client;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using SCAlcoholLicenses.Client;
 using SCAlcoholLicenses.Data;
 using SCAlcoholLicenses.Domain;
-using System;
+using System.IO;
 using System.Threading.Tasks;
-using System.Transactions;
+
 
 namespace SCAlcoholLicenses.Host
 {
 	class Program
 	{
-		static async Task Main(string[] args)
+		public static async Task Main(string[] args)
 		{
-            var binaryLocation = @"C:\Program Files\Google\Chrome Beta\Application\chrome.exe";
+			var services = new ServiceCollection();
+			ConfigureServices(services);
 
-            var seenOn = DateTimeOffset.UtcNow;
+			var serviceProvider = services.BuildServiceProvider();
 
-			var logger = NLog.LogManager.GetLogger("Default");
-
-			logger.Info("Starting execution.");
-
-			try
-			{
-				using var client = new LicenseClient(logger, "", null);
-				using var db = new ApplicationDbContext();
-				var service = new LicenseService(db);
-
-				await db.GetDbConnection().OpenAsync();
-
-				var transaction = await db.GetDbConnection().BeginTransactionAsync();
-
-				logger.Info("Getting License file");
-				var licenseFilePath = client.GetLicenseFile();
-
-				logger.Info("Parsing License file");
-				var recordsUpserted = 0;
-				foreach (var license in client.ParseLicenses(licenseFilePath))
-				{
-					await service.Upsert(license.LicenseNumber, license.BusinessName, license.LegalName,
-						license.LocationAddress, license.City, license.LicenseType, license.OpenDate,
-						license.CloseDate, license.LbdWholesaler, seenOn, transaction);
-
-					recordsUpserted++;
-
-					if (recordsUpserted % 1000 == 0)
-					{
-						logger.Debug($"Completing transaction. Total records: {recordsUpserted}");
-
-						await transaction.CommitAsync();
-						transaction = await db.GetDbConnection().BeginTransactionAsync();
-					}
-				}
-
-				await transaction.CommitAsync();
-			}
-			catch (Exception e)
-			{
-				logger.Error(e, "Execution failed!");
-				throw;
-			}
-
-			logger.Info("Completed execution.");
+			await serviceProvider.GetService<App>().Run();
 		}
+
+		private static void ConfigureServices(IServiceCollection services)
+        {
+			services.AddLogging(builder =>
+			{
+				builder.AddConsole();
+				builder.AddDebug();
+			});
+
+			var configuration = new ConfigurationBuilder()
+				.SetBasePath(Directory.GetCurrentDirectory())
+				.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+				.AddEnvironmentVariables()
+				.Build();
+
+			services.Configure<AppSettings>(configuration.GetSection("App"));
+
+			services.AddDbContext<ApplicationDbContext>(options => options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
+			services.AddTransient((provider) => provider.GetService<ApplicationDbContext>().GetDbConnection());
+
+			services.AddTransient<LicenseService>();
+
+			services.AddTransient((provider) =>
+            {
+				var logger = provider.GetService<ILogger<LicenseClient>>();
+				var settings = provider.GetService<IOptions<AppSettings>>();
+				return new LicenseClient(logger, settings.Value.SeleniumRemoteUri, settings.Value.DownloadDirectory);
+            });
+
+            services.AddTransient<App>();
+        }
+
 	}
 }

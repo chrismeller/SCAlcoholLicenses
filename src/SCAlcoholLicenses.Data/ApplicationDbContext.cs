@@ -6,10 +6,9 @@ namespace SCAlcoholLicenses.Data
 {
     public class ApplicationDbContext : DbContext
     {
-        public DbSet<License> Licenses { get; set; }
+        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) {}
 
-        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) => optionsBuilder.UseSqlServer(
-            "Data Source=localhost; Initial Catalog=SCAlcoholLicenses; User Id=SCAlcoholLicenses; Password=SCAlcoholLicenses;");
+        public DbSet<License> Licenses { get; set; }
 
         public DbConnection GetDbConnection ()
         {

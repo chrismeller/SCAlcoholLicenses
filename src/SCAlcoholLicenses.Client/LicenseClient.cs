@@ -1,6 +1,5 @@
 ﻿using ExcelDataReader;
-using NLog;
-using OfficeOpenXml;
+using Microsoft.Extensions.Logging;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Remote;
@@ -9,65 +8,61 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace SCAlcoholLicenses.Client
 {
     public class LicenseClient : IDisposable
     {
-        private readonly ILogger _logger;
+        private readonly ILogger<LicenseClient> _logger;
         private readonly string _remoteDriverUri;
-        private readonly string _chromeArgs;
-        private readonly string _binaryLocation;
+        private readonly string _downloadDirectory;
 
         private IWebDriver _browser { get; set; }
 
-        public LicenseClient(ILogger logger, string chromeArgs, string binaryLocation)
+        public LicenseClient(ILogger<LicenseClient> logger, string remoteUri, string downloadDirectory)
         {
             _logger = logger;
-
-            _chromeArgs = chromeArgs;
-            _binaryLocation = binaryLocation;
+            _remoteDriverUri = remoteUri;
+            _downloadDirectory = downloadDirectory;
         }
 
         public string GetLicenseFile()
         {
-            var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            var tempDir = Path.Combine(_downloadDirectory, Path.GetRandomFileName());
+
+            _logger.LogDebug($"Connecting to {_remoteDriverUri}");
+            _logger.LogDebug($"Using download directory: {tempDir}");
+
+            // make sure the temp directory exists
             Directory.CreateDirectory(tempDir);
 
-            //_logger.Debug($"Starting Chrome with arguments: {_chromeArgs}");
-            //_logger.Debug($"Starting Chrome with binary location: {_binaryLocation}");
-            _logger.Debug($"Using download directory: {tempDir}");
-
+            // tell chrome to write to our temp directory
             var chromeOptions = new ChromeOptions();
-            //chromeOptions.AddUserProfilePreference("download.default_directory", tempDir);
+            chromeOptions.AddUserProfilePreference("download.default_directory", tempDir);
 
-            //if (!string.IsNullOrEmpty(_chromeArgs)) chromeOptions.AddArguments(_chromeArgs.Split(','));
-            //if (!string.IsNullOrEmpty(_binaryLocation)) chromeOptions.BinaryLocation = _binaryLocation;
 
-            //_browser = new ChromeDriver(chromeOptions);
-            _browser = new RemoteWebDriver(new Uri("http://localhost:4444"), chromeOptions);
+            _browser = new RemoteWebDriver(new Uri(_remoteDriverUri), chromeOptions);
 
             var wait = new WebDriverWait(_browser, TimeSpan.FromSeconds(20));
 
-            _logger.Debug("Navigating to MyDORWay");
+            _logger.LogDebug("Navigating to MyDORWay");
 
             _browser.Navigate().GoToUrl("https://mydorway.dor.sc.gov");
 
             // wait until the page has loaded - that is, until we can see the link we want to click on, then click on it
-            _logger.Debug("Clicking on Alcohol Licenses link");
+            _logger.LogDebug("Clicking on Alcohol Licenses link");
             wait.Until(b => b.FindElement(By.XPath("//span[ contains( text(), 'Alcohol License Locations' ) ]"))).Click();
 
             // wait for the search button to be visible and click it to submit the form
-            _logger.Debug("Clicking on Search button");
+            _logger.LogDebug("Clicking on Search button");
             wait.Until(b => b.FindElement(By.XPath("//span[ contains( text(), 'SEARCH' ) ]/ancestor::button"))).Click();
 
             // set up our file watcher so we can tell when the download is complete
-            _logger.Debug("Starting file watcher");
+            _logger.LogDebug("Starting file watcher");
             var watcher = new FileSystemWatcher(tempDir, "*.xlsx");
 
             // wait for the export data button to be visible and click it
-            _logger.Debug("Clicking Export link");
+            _logger.LogDebug("Clicking Export link");
             wait.Until(b => {
                 var el = b.FindElement(By.XPath("//span[ contains( text(), 'Export Data' ) ]/ancestor::li"));
                 if (el.GetCssValue("display") != "none")
@@ -88,7 +83,8 @@ namespace SCAlcoholLicenses.Client
         public IEnumerable<AlcoholLicense> ParseLicenses(string licenseFilePath)
         {
             // we loop and wait for an exclusive read lock to make sure the file is done writing
-            _logger.Debug("Waiting for file lock");
+            _logger.LogDebug("Waiting for file lock");
+
             using var stream = WaitForLock(licenseFilePath, FileMode.Open, FileAccess.Read, FileShare.None);
             using var reader = ExcelReaderFactory.CreateReader(stream);
 
