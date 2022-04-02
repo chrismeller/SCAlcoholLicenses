@@ -18,8 +18,9 @@ namespace SCAlcoholLicenses.Data.Models
 		public string LicenseType { get; set; }
 
 		public DateTime OpenDate { get; set; }
-		public DateTime CloseDate { get; set; }
+		public DateTime CloseOrExtensionDate { get; set; }
 		public bool LbdWholesaler { get; set; }
+		public bool FoodProductManufacturer { get; set; }
 
 		public DateTimeOffset FirstSeen { get; set; }
 		public DateTimeOffset LastSeen { get; set; }

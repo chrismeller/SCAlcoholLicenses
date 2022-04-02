@@ -21,7 +21,7 @@ namespace SCAlcoholLicenses.Host
 
 			var serviceProvider = services.BuildServiceProvider();
 
-			await serviceProvider.GetService<App>().Run();
+			await serviceProvider.GetService<App>()!.Run();
 		}
 
 		private static void ConfigureServices(IServiceCollection services)
@@ -35,21 +35,21 @@ namespace SCAlcoholLicenses.Host
 			var configuration = new ConfigurationBuilder()
 				.SetBasePath(Directory.GetCurrentDirectory())
 				.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-				.AddEnvironmentVariables()
+                .AddEnvironmentVariables()
 				.Build();
 
 			services.Configure<AppSettings>(configuration.GetSection("App"));
 
 			services.AddDbContext<ApplicationDbContext>(options => options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
-			services.AddTransient((provider) => provider.GetService<ApplicationDbContext>().GetDbConnection());
+			services.AddTransient((provider) => provider.GetService<ApplicationDbContext>()!.GetDbConnection());
 
 			services.AddTransient<LicenseService>();
 
-			services.AddTransient((provider) =>
+            services.AddTransient((provider) =>
             {
-				var logger = provider.GetService<ILogger<LicenseClient>>();
-				var settings = provider.GetService<IOptions<AppSettings>>();
-				return new LicenseClient(logger, settings.Value.SeleniumRemoteUri, settings.Value.DownloadDirectory);
+                var logger = provider.GetRequiredService<ILogger<LicenseClient>>();
+                var settings = provider.GetRequiredService<IOptions<AppSettings>>();
+                return new LicenseClient(logger, settings.Value.Proxy.Hostname, settings.Value.Proxy.Username, settings.Value.Proxy.Password);
             });
 
             services.AddTransient<App>();

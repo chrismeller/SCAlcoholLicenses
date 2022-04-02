@@ -42,7 +42,7 @@ namespace SCAlcoholLicenses.Host
 				var transaction = await _db.BeginTransactionAsync();
 
 				_logger.LogInformation("Getting License file");
-				var licenseFilePath = _client.GetLicenseFile();
+				var licenseFilePath = await _client.GetLicenseFile();
 
 				_logger.LogInformation("Parsing License file");
 				var recordsUpserted = 0;
@@ -50,7 +50,7 @@ namespace SCAlcoholLicenses.Host
 				{
 					await _service.Upsert(license.LicenseNumber, license.BusinessName, license.LegalName,
 						license.LocationAddress, license.City, license.LicenseType, license.OpenDate,
-						license.CloseDate, license.LbdWholesaler, seenOn, transaction);
+						license.CloseOrExtensionDate, license.LbdWholesaler, license.FoodProductManufacturer, seenOn, transaction);
 
 					recordsUpserted++;
 

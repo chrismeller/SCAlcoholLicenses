@@ -15,13 +15,13 @@ namespace SCAlcoholLicenses.Domain
 			_db = db;
 		}
 
-		public async Task Create(string licenseNumber, string businessName, string legalName, string locationAddress, string city, string licenseType, DateTime openDate, DateTime closeDate, bool lbdWholesaler, DateTimeOffset now, DbTransaction transaction)
+		public async Task Create(string licenseNumber, string businessName, string legalName, string locationAddress, string city, string licenseType, DateTime openDate, DateTime closeDate, bool lbdWholesaler, bool foodProductManufacturer, DateTimeOffset now, DbTransaction transaction)
 		{
 			await _db.ExecuteAsync(@"
 insert into Licenses
-	(Id, LicenseNumber, BusinessName, LegalName, LocationAddress, City, LicenseType, OpenDate, CloseDate, LbdWholesaler, FirstSeen, LastSeen)
+	(Id, LicenseNumber, BusinessName, LegalName, LocationAddress, City, LicenseType, OpenDate, CloseOrExtensionDate, LbdWholesaler, FoodProductManufacturer, FirstSeen, LastSeen)
 values
-	(@Id, @LicenseNumber, @BusinessName, @LegalName, @LocationAddress, @City, @LicenseType, @OpenDate, @CloseDate, @LbdWholesaler, @FirstSeen, @LastSeen)",
+	(@Id, @LicenseNumber, @BusinessName, @LegalName, @LocationAddress, @City, @LicenseType, @OpenDate, @CloseOrExtensionDate, @LbdWholesaler, @FoodProductManufacturer, @FirstSeen, @LastSeen)",
 	new
     {
 		Id = Guid.NewGuid(),
@@ -32,8 +32,9 @@ values
 		City = city,
 		LicenseType = licenseType,
 		OpenDate = openDate,
-		CloseDate = closeDate,
+		CloseOrExtensionDate = closeDate,
 		LbdWholesaler = lbdWholesaler,
+		FoodProductManufacturer = foodProductManufacturer,
 		FirstSeen = now,
 		LastSeen = now,
 	}, transaction);
@@ -52,7 +53,7 @@ values
 		}
 
 		public async Task Upsert(string licenseNumber, string businessName, string legalName, string locationAddress,
-			string city, string licenseType, DateTime openDate, DateTime closeDate, bool lbdWholesaler, DateTimeOffset now, DbTransaction transaction)
+			string city, string licenseType, DateTime openDate, DateTime closeDate, bool lbdWholesaler, bool foodProductManufacturer, DateTimeOffset now, DbTransaction transaction)
 		{
 			var existing = await Get(licenseNumber, licenseType, openDate, transaction);
 
@@ -61,8 +62,8 @@ values
 				await _db.ExecuteAsync(@"
 update Licenses set
 	LicenseNumber = @LicenseNumber, BusinessName = @BusinessName, LegalName = @LegalName,
-	LocationAddress = @LocationAddress, City = @City, LicenseType = @LicenseType, OpenDate = @OpenDate, CloseDate = @CloseDate,
-	LbdWholesaler = @LbdWholesaler, LastSeen = @LastSeen
+	LocationAddress = @LocationAddress, City = @City, LicenseType = @LicenseType, OpenDate = @OpenDate, CloseOrExtensionDate = @CloseOrExtensionDate,
+	LbdWholesaler = @LbdWholesaler, FoodProductManufacturer = @FoodProductManufacturer, LastSeen = @LastSeen
 where LicenseNumber = @LicenseNumber and OpenDate = @OpenDate",
 					new
                     {
@@ -73,14 +74,15 @@ where LicenseNumber = @LicenseNumber and OpenDate = @OpenDate",
 						City = city,
 						LicenseType = licenseType,
 						OpenDate = openDate,
-						CloseDate = closeDate,
+						CloseOrExtensionDate = closeDate,
 						LbdWholesaler = lbdWholesaler,
+						FoodProductManufacturer = foodProductManufacturer,
 						LastSeen = now,
                     }, transaction);
 			}
 			else
 			{
-				await Create(licenseNumber, businessName, legalName, locationAddress, city, licenseType, openDate, closeDate, lbdWholesaler, now, transaction);
+				await Create(licenseNumber, businessName, legalName, locationAddress, city, licenseType, openDate, closeDate, lbdWholesaler, foodProductManufacturer, now, transaction);
 			}
 		}
 	}

@@ -2,7 +2,13 @@
 {
 	public class AppSettings
 	{
-		public string SeleniumRemoteUri { get; set; }
-		public string DownloadDirectory { get; set; }
+        public class ProxyInfo
+        {
+			public string Hostname { get; set; }
+			public string Username { get; set; }
+			public string Password { get; set; }
+        }
+
+		public ProxyInfo Proxy { get; set; }
 	}
 }
