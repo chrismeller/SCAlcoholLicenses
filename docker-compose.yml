@@ -5,19 +5,11 @@ volumes:
   db_data:
 
 services:
-  selenium:
-    image: selenium/standalone-chrome
-    ports:
-      - 4444:4444
-    shm_size: 2gb
-    restart: always
-    volumes:
-      - downloads:/downloads
-
   db:
     image: mcr.microsoft.com/mssql/server:2019-latest
     ports:
       - 1433:1433
+    restart: unless-stopped
     environment:
       - ACCEPT_EULA=Y
       - SA_PASSWORD=Microsoft2021!
@@ -37,9 +29,6 @@ services:
       - DB_PASS=Microsoft2021!
       - DB_NAME=SCAlcoholLicenses
       - TZ=Utc
-    restart: always
-    volumes:
-      - downloads:/downloads
+    restart: unless-stopped
     depends_on:
-      - selenium
       - db
