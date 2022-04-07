@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "SCAlcoholLicenses.Host": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}

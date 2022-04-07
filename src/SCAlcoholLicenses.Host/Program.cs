@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -8,6 +9,7 @@ using SCAlcoholLicenses.Data;
 using SCAlcoholLicenses.Domain;
 using System.IO;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
 
 
 namespace SCAlcoholLicenses.Host
@@ -15,44 +17,30 @@ namespace SCAlcoholLicenses.Host
 	class Program
 	{
 		public static async Task Main(string[] args)
-		{
-			var services = new ServiceCollection();
-			ConfigureServices(services);
-
-			var serviceProvider = services.BuildServiceProvider();
-
-			await serviceProvider.GetService<App>()!.Run();
-		}
-
-		private static void ConfigureServices(IServiceCollection services)
         {
-			services.AddLogging(builder =>
-			{
-				builder.AddConsole();
-				builder.AddDebug();
-			});
+            using var host = Microsoft.Extensions.Hosting.Host.CreateDefaultBuilder(args)
+                .ConfigureServices((hostContext, services) =>
+                {
+                    services.AddSingleton<App>();
 
-			var configuration = new ConfigurationBuilder()
-				.SetBasePath(Directory.GetCurrentDirectory())
-				.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-                .AddEnvironmentVariables()
-				.Build();
+                    services.Configure<AppSettings>(hostContext.Configuration.GetSection("App"));
 
-			services.Configure<AppSettings>(configuration.GetSection("App"));
+                    services.AddDbContext<ApplicationDbContext>(options =>
+                        options.UseSqlServer(hostContext.Configuration.GetConnectionString("DefaultConnection")), ServiceLifetime.Singleton);
 
-			services.AddDbContext<ApplicationDbContext>(options => options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
-			services.AddTransient((provider) => provider.GetService<ApplicationDbContext>()!.GetDbConnection());
+                    services.AddSingleton<LicenseService>();
 
-			services.AddTransient<LicenseService>();
+                    services.AddSingleton(provider =>
+                    {
+                        var logger = provider.GetRequiredService<ILogger<LicenseClient>>();
+                        var settings = provider.GetRequiredService<IOptions<AppSettings>>();
+                        return new LicenseClient(logger, settings.Value.Proxy.Hostname, settings.Value.Proxy.Username,
+                            settings.Value.Proxy.Password);
+                    });
+                })
+                .Build();
 
-            services.AddTransient((provider) =>
-            {
-                var logger = provider.GetRequiredService<ILogger<LicenseClient>>();
-                var settings = provider.GetRequiredService<IOptions<AppSettings>>();
-                return new LicenseClient(logger, settings.Value.Proxy.Hostname, settings.Value.Proxy.Username, settings.Value.Proxy.Password);
-            });
-
-            services.AddTransient<App>();
+            await host.Services.GetService<App>()!.Run();
         }
 
 	}
