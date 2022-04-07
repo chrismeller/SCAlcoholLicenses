@@ -1,9 +1,12 @@
-FROM mcr.microsoft.com/dotnet/runtime:6.0 AS base
+FROM mcr.microsoft.com/playwright/dotnet:latest AS base
 
 RUN useradd dotnet
 
 
 FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
+
+# install the entity framework tools
+RUN dotnet tool install --global dotnet-ef
 
 WORKDIR /source
 
@@ -25,17 +28,18 @@ COPY ./src/SCAlcoholLicenses.Domain/* ./src/SCAlcoholLicenses.Domain/
 COPY ./src/SCAlcoholLicenses.Host/* ./src/SCAlcoholLicenses.Host/
 
 # publish
-RUN dotnet publish -c release -o /app --no-restore ./src/SCAlcoholLicenses.Host
+RUN dotnet publish -c Release -o /app --no-restore ./src/SCAlcoholLicenses.Host
+
+# generate a migrations bundle
+RUN dotnet tool restore
+RUN dotnet ef migrations bundle --project ./src/SCAlcoholLicenses.Host --no-build --verbose --configuration Release -o /app/efbundle.exe
 
 # copy all our build artifacts over
 FROM base AS release
 WORKDIR /app
-COPY --from=build /app ./
-
-# make sure everything is owned by the right user
-RUN chown -R dotnet:dotnet /app
+COPY --from=build --chown=dotnet:dotnet /app ./
 
 # and run our app as that user
 USER dotnet
 
-ENTRYPOINT ["dotnet", "SCAlcoholLicenses.Host.dll"]
+CMD ["dotnet", "SCAlcoholLicenses.Host.dll"]
