@@ -1,7 +1,6 @@
 version: '3.4'
 
 volumes:
-  downloads:
   db_data:
 
 services:
@@ -16,19 +15,58 @@ services:
       - MSSQL_PID=Developer
       - TZ=Utc
     volumes:
-      - db_data:/var/opt/mssql/data
-      - ./db-init/
+      - type: volume
+        source: db_data
+        target: /var/opt/mssql
+    hostname: db
+
+  db-init:
+    image: mcr.microsoft.com/mssql-tools
+    restart: on-failure
+    environment:
+      - DB_HOST=db
+      # must be in double quotes to appease the T-SQL gods
+      - DB_NAME="SCAlcoholLicenses"
+      - SA_PASSWORD=Microsoft2021!
+    command: >
+      bash -c '/opt/mssql-tools/bin/sqlcmd -S $$DB_HOST -U sa -P $$SA_PASSWORD -b -Q "
+      IF NOT EXISTS ( SELECT * FROM sys.databases WHERE name = $$DB_NAME )
+      BEGIN
+        CREATE DATABASE [$$DB_NAME];
+      END
+      "'
+    depends_on:
+      db:
+        condition: service_started
+
+  migrations:
+    image: scalcohollicenses:latest
+    build: ./
+    environment:
+      - CUSTOMCONNSTR_DefaultConnection=Server=db;Database=SCAlcoholLicenses;User Id=sa;Password=Microsoft2021!;
+      - DOTNET_ENVIRONMENT=Production
+      - DOTNET_BUNDLE_EXTRACT_BASE_DIR=/tmp
+      - TZ=Utc
+    restart: "no"
+    command: sh -c ./efbundle.exe --connection $$CUSTOMCONNSTR_DefaultConnection
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
 
   app:
     image: scalcohollicenses:latest
     build: ./
     environment:
-      - SELENIUM_REMOTE_URI=http://selenium:4444
-      - DB_HOST=db
-      - DB_USER=sa
-      - DB_PASS=Microsoft2021!
-      - DB_NAME=SCAlcoholLicenses
+      - CUSTOMCONNSTR_DefaultConnection=Server=db;Database=SCAlcoholLicenses;User Id=sa;Password=Microsoft2021!
+      - DOTNET_ENVIRONMENT=Production
       - TZ=Utc
-    restart: unless-stopped
+    env_file:
+      - .env
+    restart: on-failure
+    security_opt:
+      - "seccomp=seccomp_profile.json"
     depends_on:
-      - db
+      db:
+        condition: service_started
+      migrations:
+          condition: service_completed_successfully
