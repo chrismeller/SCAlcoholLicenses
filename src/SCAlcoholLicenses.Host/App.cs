@@ -3,8 +3,11 @@ using Microsoft.Extensions.Options;
 using SCAlcoholLicenses.Client;
 using SCAlcoholLicenses.Domain;
 using System;
-using System.Data.Common;
+using System.Data;
+using System.Linq;
 using System.Threading.Tasks;
+using SCAlcoholLicenses.Data;
+using SCAlcoholLicenses.Data.Models;
 
 namespace SCAlcoholLicenses.Host
 {
@@ -14,57 +17,60 @@ namespace SCAlcoholLicenses.Host
         private readonly AppSettings _settings;
 		private readonly LicenseClient _client;
 		private readonly LicenseService _service;
-		private readonly DbConnection _db;
+		private readonly IDbConnection _db;
 
-        public App(IOptions<AppSettings> settings, ILogger<App> logger, LicenseClient client, LicenseService service, DbConnection db)
+        public App(IOptions<AppSettings> settings, ILogger<App> logger, LicenseClient client, LicenseService service, ApplicationDbContext db)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
 			_client = client ?? throw new ArgumentNullException(nameof(client));
 			_service = service ?? throw new ArgumentNullException(nameof(service));
-			_db = db ?? throw new ArgumentNullException(nameof(db));
+			_db = db.Connection ?? throw new ArgumentNullException(nameof(db));
         }
 
         public async Task Run()
         {
 			try
 			{
-				_logger.LogDebug("Beginning exection");
+				_logger.LogDebug("Beginning execution");
 
-				var seenOn = DateTimeOffset.UtcNow;
+                // make sure the db connection is open
+                if (_db.State != System.Data.ConnectionState.Open && _db.State != System.Data.ConnectionState.Connecting)
+                {
+                    _db.Open();
+                }
 
-				// make sure the db connection is open
-				if (_db.State != System.Data.ConnectionState.Open && _db.State != System.Data.ConnectionState.Connecting)
-				{
-					await _db.OpenAsync();
-				}
-
-				var transaction = await _db.BeginTransactionAsync();
-
-				_logger.LogInformation("Getting License file");
+                _logger.LogInformation("Getting License file");
 				var licenseFilePath = await _client.GetLicenseFile();
 
 				_logger.LogInformation("Parsing License file");
-				var recordsUpserted = 0;
-				foreach (var license in _client.ParseLicenses(licenseFilePath))
-				{
-					await _service.Upsert(license.LicenseNumber, license.BusinessName, license.LegalName,
-						license.LocationAddress, license.City, license.LicenseType, license.OpenDate,
-						license.CloseOrExtensionDate, license.LbdWholesaler, license.FoodProductManufacturer, seenOn, transaction);
 
-					recordsUpserted++;
+                var licenses = _client.ParseLicenses(licenseFilePath).ToList();
 
-					if (recordsUpserted % 1000 == 0)
-					{
-						_logger.LogDebug($"Completing transaction. Total records: {recordsUpserted}");
+                _logger.LogInformation($"Found {licenses.Count} licenses.");
 
-						await transaction.CommitAsync();
-						transaction = await _db.BeginTransactionAsync();
-					}
-				}
+				// convert them into database entities
+                var dbLicenses = licenses.Select(x => new License()
+                {
+                    BusinessName = x.BusinessName,
+                    City = x.City,
+                    CloseOrExtensionDate = x.CloseOrExtensionDate,
+                    FoodProductManufacturer = x.FoodProductManufacturer,
+                    LbdWholesaler = x.LbdWholesaler,
+                    LegalName = x.LegalName,
+                    LicenseNumber = x.LicenseNumber,
+                    LicenseType = x.LicenseType,
+                    LocationAddress = x.LocationAddress,
+                    OpenDate = x.OpenDate,
 
-				await transaction.CommitAsync();
-			}
+                    // these get overwritten in the service, so they're just placeholders
+                    Id = Guid.Empty,
+                    FirstSeen = DateTimeOffset.UtcNow,
+                    LastSeen = DateTimeOffset.UtcNow,
+                });
+
+                await _service.UpsertBatch(dbLicenses);
+            }
 			catch (Exception e)
 			{
 				_logger.LogError(e, "Execution failed!");
