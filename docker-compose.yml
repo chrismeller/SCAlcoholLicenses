@@ -40,7 +40,7 @@ services:
         condition: service_started
 
   migrations:
-    image: scalcohollicenses:latest
+    image: ghcr.io/chrismeller/scalcohollicenses:main
     build: ./
     environment:
       - CUSTOMCONNSTR_DefaultConnection=Server=db;Database=SCAlcoholLicenses;User Id=sa;Password=Microsoft2021!;
@@ -54,7 +54,7 @@ services:
         condition: service_completed_successfully
 
   app:
-    image: scalcohollicenses:latest
+    image: ghcr.io/chrismeller/scalcohollicenses:main
     build: ./
     environment:
       - CUSTOMCONNSTR_DefaultConnection=Server=db;Database=SCAlcoholLicenses;User Id=sa;Password=Microsoft2021!
