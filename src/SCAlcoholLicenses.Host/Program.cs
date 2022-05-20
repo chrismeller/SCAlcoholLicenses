@@ -41,6 +41,7 @@ namespace SCAlcoholLicenses.Host
                 .Build();
 
             await host.Services.GetService<App>()!.Run();
+            await host.StopAsync();
         }
 
 	}
