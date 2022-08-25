@@ -2,12 +2,13 @@ name: Build
 on:
   push:
     branches:
-      - master
+      - main
   pull_request:
     types: [opened, synchronize, reopened]
+  workflow_dispatch:
 jobs:
   build:
-    name: Build
+    name: SonarCloud
     runs-on: windows-latest
     steps:
       - name: Set up JDK 11
