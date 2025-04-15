@@ -37,7 +37,7 @@ jobs:
       # https://github.com/sigstore/cosign-installer
       - name: Install cosign
         if: github.event_name != 'pull_request'
-        uses: sigstore/cosign-installer@b6ee8f83b9a8b8ef7f46b5a8ff326f488b386693
+        uses: sigstore/cosign-installer@3454372f43399081ed03b604cb2d021dabca52bb
 
       # Workaround: https://github.com/docker/build-push-action/issues/461
       - name: Setup Docker buildx
